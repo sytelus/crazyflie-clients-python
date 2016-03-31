@@ -1,122 +1,123 @@
 #!/usr/bin/env python3
-
-from distutils.core import setup
-import glob
-import os
+# -*- coding: utf-8 -*-
+import subprocess
+from subprocess import PIPE, Popen
+from setuptools import setup, find_packages
+from glob import glob
+import json
+import codecs
 import sys
-from subprocess import Popen, PIPE
+import os
+
+try:
+    import py2exe  # noqa
+except:
+    pass
+
+if sys.version_info < (3, 4):
+    raise "must use python 3.4 or greater"
 
 
 # Recover version from Git
-try:
-    process = Popen(["git", "describe", "--tags"], stdout=PIPE)
-    (output, err) = process.communicate()
-    exit_code = process.wait()
-except OSError:
-    raise Exception("Cannot run git: Git is required to generate packages!")
-
-VERSION = output.strip().decode("UTF-8")
-
-toplevel_data_files = ['README.md', 'LICENSE.txt']
-
-# Platform specific settings
-if sys.platform.startswith('win32'):
+def get_version():
     try:
-        import py2exe
-    except ImportError:
-        print("Warning: py2exe not usable")
+        process = Popen(["git", "describe", "--tags"], stdout=PIPE)
+        (output, err) = process.communicate()
+        process.wait()
+    except OSError:
+        raise Exception("Cannot run git: " +
+                        "Git is required to generate packages!")
 
-    setup_args = dict(
-        console=[{
-            "script": 'bin/cfclient',
-            "icon_resources": [(1, "bitcraze.ico")]
-        }],
-        options={"py2exe": {
-            "includes": [
-                "sip", "PyQt4",
-                "cfclient.ui.widgets",
-                "cflib.bootloader.cloader",
-                "cfclient.ui.toolboxes.*",
-                "cfclient.ui.*",
-                "cfclient.ui.tabs.*",
-                "cfclient.ui.widgets.*",
-                "cfclient.ui.dialogs.*",
-                "cfclient.utils.input.inputreaders.*",
-                "cfclient.utils.input.inputinterfaces.*",
-                'zmq.backend.cython'],
-            "excludes": [
-                "AppKit",
-                'zmq.libzmq'],
-            'dll_excludes': [
-                'libzmq.pyd'],
-            "skip_archive": True}})
+    version = output.strip().decode("UTF-8")
 
-    toplevel_data_files.append('SDL2.dll')
-else:
-    setup_args = dict(
-        scripts=['bin/cfclient', 'bin/cfheadless'])
+    if subprocess.call(["git", "diff-index", "--quiet", "HEAD"]) != 0:
+        version += "_modified"
+
+    return version
+
+VERSION = get_version()
+
+with codecs.open('version.json', 'w', encoding='utf8') as f:
+    f.write(json.dumps({'version': VERSION}))
+
+platform_requires = []
+platform_dev_requires = []
+if sys.platform == 'win32' or sys.platform == 'darwin':
+    platform_requires = ['pysdl2']
+if sys.platform == 'win32':
+    platform_dev_requires = ['py2exe', 'jinja2']
+
+
+def relative(lst, base=''):
+    return list(map(lambda x: base + os.path.basename(x), lst))
 
 # Initial parameters
-setup_args = dict(name='cfclient',
-                  description='Bitcraze Cazyflie nano quadcopter client',
-                  version=VERSION,
-                  author='Bitcraze team',
-                  author_email='contact@bitcraze.se',
-                  url='http://www.bitcraze.se',
-                  package_dir={'': 'lib'},
-                  packages=['cfclient', 'cfclient.ui', 'cfclient.ui.tabs',
-                            'cfclient.ui.toolboxes', 'cfclient.ui.widgets',
-                            'cfclient.utils', 'cfclient.ui.dialogs', 'cflib',
-                            'cflib.bootloader', 'cflib.crazyflie',
-                            'cflib.drivers',
-                            'cflib.utils', 'cflib.crtp',
-                            'cfclient.utils.input',
-                            'cfclient.utils.input.inputinterfaces',
-                            'cfclient.utils.input.mux',
-                            'cfclient.utils.input.inputreaders'],
-                  data_files=[('', toplevel_data_files),
-                              ('cfclient/ui',
-                               glob.glob('lib/cfclient/ui/*.ui')),
-                              ('cfclient/ui/tabs',
-                               glob.glob('lib/cfclient/ui/tabs/*.ui')),
-                              ('cfclient/ui/widgets',
-                               glob.glob('lib/cfclient/ui/widgets/*.ui')),
-                              ('cfclient/ui/toolboxes',
-                               glob.glob('lib/cfclient/ui/toolboxes/*.ui')),
-                              ('cfclient/ui/dialogs',
-                               glob.glob('lib/cfclient/ui/dialogs/*.ui')),
-                              ('cfclient/configs',
-                               glob.glob('lib/cfclient/configs/*.json')),
-                              ('cflib/cache',
-                               glob.glob('lib/cflib/cache/*.json')),
-                              ('cfclient/configs/input',
-                               glob.glob('lib/cfclient/configs/input/*.json')),
-                              ('cfclient/configs/log',
-                               glob.glob('lib/cfclient/configs/log/*.json')),
-                              ('cfclient',
-                               glob.glob('lib/cfclient/*.png'))],
-                  **setup_args)
+setup(
+    name='cfclient',
+    description='Bitcraze Cazyflie quadcopter client',
+    version=VERSION,
+    author='Bitcraze team',
+    author_email='contact@bitcraze.se',
+    url='http://www.bitcraze.io',
 
+    classifiers=[
+        'License :: OSI Approved :: GPLv2 License',
 
-# Fetch values from package.xml when using catkin
-if os.getenv('CATKIN_TEST_RESULTS_DIR'):
-    from catkin_pkg.python_setup import generate_distutils_setup
-    # Delete keys which should not match catkin packaged variant
-    for k in ('version', 'url'):
-        setup_args.pop(k, None)
-    setup_args = generate_distutils_setup(**setup_args)
+        'Programming Language :: Python :: 3.4',
+        'Programming Language :: Python :: 3.5',
+    ],
 
+    keywords='quadcopter crazyflie',
 
-# Write a temp file to pass verision into script
-version_file = os.path.join(os.path.dirname(__file__),
-                            "lib", "cfclient", "version.py")
-try:
-    with open(version_file, "w") as versionpy:
-        versionpy.write("VERSION='{}'".format(VERSION))
-except:
-    print("Warning: Version file cannot be written.")
+    package_dir={'': 'src'},
+    packages=find_packages('src'),
 
-setup(**setup_args)
+    entry_points={
+        'console_scripts': [
+            'cfclient=cfclient.gui:main',
+            'cfheadless=cfclient.headless:main',
+            'cfloader=cfloader:main',
+            'cfzmq=cfzmq:main'
+        ],
+    },
 
-if (os.path.isfile(version_file)):
-    os.remove(version_file)
+    install_requires=platform_requires + ['cflib', 'appdirs'],
+
+    # List of dev dependencies
+    # You can install them by running
+    # $ pip install -e .[dev]
+    extras_require={
+        'dev': platform_dev_requires + []
+    },
+
+    package_data={
+        'cfclient.ui':  relative(glob('src/cfclient/ui/*.ui')),
+        'cfclient.ui.tabs': relative(glob('src/cfclient/ui/tabs/*.ui')),
+        'cfclient.ui.widgets':  relative(glob('src/cfclient/ui/widgets/*.ui')),
+        'cfclient.ui.toolboxes':  relative(glob('src/cfclient/ui/toolboxes/*.ui')),  # noqa
+        'cfclient.ui.dialogs':  relative(glob('src/cfclient/ui/dialogs/*.ui')),
+        'cfclient':  relative(glob('src/cfclient/configs/*.json'), 'configs/') +  # noqa
+                     relative(glob('src/cfclient/configs/input/*.json'), 'configs/input/') +  # noqa
+                     relative(glob('src/cfclient/configs/log/*.json'), 'configs/log/') +  # noqa
+                     relative(glob('src/cfclient/resources/*'), 'resources/') +
+                     relative(glob('src/cfclient/*.png')),
+    },
+
+    # Py2exe options
+    console=[
+        {
+            'script': 'bin/cfclient',
+            'icon_resources': [(0, 'bitcraze.ico')]
+        }
+    ],
+    py2exe={
+        'includes': ['cfclient.ui.widgets.hexspinbox'],
+        'bundle_files': 3,
+        'skip_archive': True,
+    },
+
+    data_files=[
+        ('', ['README.md', 'version.json']),
+        ('third_party', glob('src/cfclient/third_party/*')),
+    ],
+)

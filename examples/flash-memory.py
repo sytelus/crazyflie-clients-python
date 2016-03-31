@@ -25,7 +25,7 @@ import sys
 import time
 import datetime
 
-sys.path.append("../lib")
+sys.path.append("../src/cflib")
 import cflib.crtp  # noqa
 from cflib.crazyflie import Crazyflie  # noqa
 from cflib.crazyflie.mem import MemoryElement  # noqa
@@ -39,6 +39,7 @@ class Flasher(object):
     """
     A class that can flash the DS28E05 EEPROM via CRTP.
     """
+
     def __init__(self, link_uri):
         self._cf = Crazyflie()
         self._link_uri = link_uri

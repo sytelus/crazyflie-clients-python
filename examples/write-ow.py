@@ -33,12 +33,10 @@ EEPROM memories and lists its contents.
 import sys
 import logging
 import time
-from threading import Timer
 
-sys.path.append("../lib")
+sys.path.append("../src/cflib")
 import cflib.crtp  # noqa
-from cfclient.utils.logconfigreader import LogConfig  # noqa
-from cflib.crazyflie.mem import MemoryElement, OWElement
+from cflib.crazyflie.mem import MemoryElement, OWElement  # noqa
 from cflib.crazyflie import Crazyflie  # noqa
 
 # Only output errors from the logging framework
@@ -93,8 +91,8 @@ class EEPROMExample:
             mems[0].write_data(self._data_written)
 
     def _data_written(self, mem, addr):
-            print("Data written, reading back...")
-            mem.update(self._data_updated)
+        print("Data written, reading back...")
+        mem.update(self._data_updated)
 
     def _data_updated(self, mem):
         print("Updated id={}".format(mem.id))
